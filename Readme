@@ -1,0 +1,2 @@
+папка backend - это бэк, там Django приложение (DjangoRestFramework, Python)
+папка frontend - это фронт, там React-приложение, только созданное, ничего с ним не делал
