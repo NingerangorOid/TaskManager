@@ -15,12 +15,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 3rd party
+
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
-    # Local
+
     'backend',
+    'accounts',
+    'tasks',
 ]
 
 MIDDLEWARE = [
@@ -122,3 +124,5 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
