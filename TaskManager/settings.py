@@ -21,8 +21,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
 
     'backend',
-    'accounts',
-    'tasks',
 ]
 
 MIDDLEWARE = [
@@ -55,7 +53,7 @@ DATABASES = {
 }
 
 # === AUTH ===
-AUTH_USER_MODEL = 'backend.User'  # Используем кастомного пользователя
+# AUTH_USER_MODEL = 'backend.User'  # Используем кастомного пользователя
 
 
 # Templates

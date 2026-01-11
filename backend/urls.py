@@ -21,7 +21,6 @@ router.register(
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),  # ← добавили админку
     path('', include(router.urls)),
 ]
 
