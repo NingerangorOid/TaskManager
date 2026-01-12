@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import api_view
 from .models import Task, Comment, Attachment
 from .serializers import (UserSerializer, TaskSerializer, CommentSerializer,
                           AttachmentSerializer, TelegramTokenSerializer)
@@ -68,3 +70,22 @@ class ProfileViewSet(viewsets.ViewSet):
         serializer = TelegramTokenSerializer(context={'request': request})
         result = serializer.create({})
         return Response(result, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+def demo_login(request):
+    username = 'admin'
+    password = 'admin123'
+
+    # Создаём пользователя, если его нет
+    if not User.objects.filter(username=username).exists():
+        User.objects.create_superuser(username, 'admin@example.com', password)
+
+    # Получаем JWT-токен
+    user = User.objects.get(username=username)
+    refresh = RefreshToken.for_user(user)
+
+    return Response({
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    })
