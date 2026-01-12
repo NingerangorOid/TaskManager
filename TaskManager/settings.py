@@ -41,7 +41,7 @@ WSGI_APPLICATION = 'TaskManager.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME', 'taskmanager'),
+        'NAME': 'taskmanager',
         'USER': os.getenv('DB_USER', 'root'),
         'PASSWORD': os.getenv('DB_PASSWORD', '1111'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
@@ -52,8 +52,6 @@ DATABASES = {
     }
 }
 
-# === AUTH ===
-# AUTH_USER_MODEL = 'backend.User'  # Используем кастомного пользователя
 
 
 # Templates

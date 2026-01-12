@@ -1,12 +1,30 @@
 
-Бэкенд: Django + Django REST Framework (Python) — реализованы модели задач,
-пользователей, аутентификация, CRUD-операции через REST API.
+Бэкенд: Django + Django REST Framework (Python) — реализованы модели бд,
+пользователей, CRUD-операции через REST API.
 
 Фронтенд: React — базовая структура приложения создана,
 интеграция с бэкендом в процессе разработки.
 
-БД: MYSQL,
+БД: MYSQL
+
+Подготовка к запуску:
+
+git clone https://github.com/NingerangorOid/TaskManager
+
+создайте новую mysql базу в корне проекта командой
+CREATE DATABASE taskmanager_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+таблицы создаются командой
+python manage.py migrate
+(миграции уже созданы и лежат на гите)
+
+далее
+python manage.py createsuperuser
+
+
 
 Запуск приложения:
 из корня проекта в терминале: cd frontend
 npm run dev
+после этого запускается фронт на http://localhost:3000, но если перейти на 8000 порт, бэк тоже работает,
+надо попытаться как-то их совместить

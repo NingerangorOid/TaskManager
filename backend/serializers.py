@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.utils.crypto import get_random_string
-from .models import User, Task, Comment, Attachment
+from .models import Task, Comment, Attachment
+from django.contrib.auth.models import User  # ← вот так правильно!
+
 
 
 class UserSerializer(serializers.ModelSerializer):
