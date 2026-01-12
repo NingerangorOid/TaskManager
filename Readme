@@ -1,16 +1,37 @@
+
+
+
+
 Бэкенд: Django + Django REST Framework (Python) — реализованы модели бд,
 пользователей, CRUD-операции через REST API.
 
-есть модели для всех таблиц, вьюсеты, роуты и сериализаторы
+Модель                     Роуты                     Вьюсеты               Сериализаторы
+-------------------------------------------------------------------------------------------
+backend.User              /api/users/               UserViewSet           UserSerializer
+backend.Task              /api/tasks/               TaskViewSet           TaskSerializer
+backend.Comment           /api/comments/            CommentViewSet        CommentSerializer
+backend.Attachment        /api/attachments/         AttachmentViewSet     AttachmentSerializer
+backend.TelegramProfile*  — (в разработке)       — (в разработке)      — (в разработке)
+
+*TelegramProfile — модель для будущей интеграции с Telegram, пока не реализована.
 
 далее по мере наполнения фронта надо дописывать роуты, вьюсеты/вьюфункции по необходимости, основной каркас готов
+ну, только с авторизацией ещё беда, но поправимо, главное что апи в принципе работает, остальное решаемо
+
+
+
+
 
 Фронтенд: React — базовая структура приложения создана,
 интеграция с бэкендом в процессе разработки.
 шаблон натянул, осталось наполнить таблицы содержимым
 
 
+
+
+
 БД: MYSQL
+таблицы
 
 1. backend_user
 (или auth_user, если не используется кастомная модель)
@@ -53,6 +74,9 @@ django_session — сессии пользователей (если испол�
 django_admin_log — лог действий в админке.
 
 
+
+
+
 Подготовка к запуску того, что есть:
 
 git clone https://github.com/NingerangorOid/TaskManager
@@ -68,6 +92,9 @@ python manage.py migrate
 python manage.py createsuperuser (и там имя, адрес почты можно пропустить и пароль)
 
 
+
+
+
 Запуск фронта:
 из корня проекта в терминале: cd frontend
 npm run dev
@@ -76,6 +103,9 @@ npm run dev
 
 соответственно дальнейший план связать красивый шаблон с бэком, чтобы на одном эндпоинте 
 работал фронт, бэк принимал сигналы с кнопок и тп
+
+
+
 
 апишка к телеге:
 1
