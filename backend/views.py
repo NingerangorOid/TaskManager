@@ -5,7 +5,12 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view
-from .models import Task, Comment, Attachment
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.views import View
+import json
+from .models import Task, Comment, Attachment, TelegramSubscription
 from .serializers import (UserSerializer, TaskSerializer, CommentSerializer,
                           AttachmentSerializer, TelegramTokenSerializer)
 
@@ -42,6 +47,27 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         task = Task.objects.get(pk=self.kwargs['task_pk'])
         serializer.save(author=self.request.user, task=task)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TelegramLinkView(View):
+    def post(self, request):
+        data = json.loads(request.body)
+        token = data.get('token')  # это chat_id, который пользователь получил от бота
+        user = request.user
+
+        if not user.is_authenticated:
+            return JsonResponse({'error': 'Not authenticated'}, status=401)
+
+        # Сохраняем или обновляем
+        sub, created = TelegramSubscription.objects.update_or_create(
+            user=user,
+            defaults={'telegram_chat_id': token}
+        )
+
+        return JsonResponse({
+            'status': 'ok',
+            'message': 'Telegram успешно привязан' if created else 'Telegram обновлён'
+        })
 
 
 class AttachmentViewSet(viewsets.ModelViewSet):
@@ -89,3 +115,28 @@ def demo_login(request):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     })
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TelegramLinkView(View):
+    def post(self, request):
+        data = json.loads(request.body)
+        chat_id = data.get('chat_id')  # ← имя поля должно совпадать с тем, что шлёт фронт
+        user = request.user
+
+        if not user.is_authenticated:
+            return JsonResponse({'error': 'Not authenticated'}, status=401)
+
+        if not chat_id:
+            return JsonResponse({'error': 'chat_id is required'}, status=400)
+
+        # Сохраняем или обновляем
+        sub, created = TelegramSubscription.objects.update_or_create(
+            user=user,
+            defaults={'telegram_chat_id': chat_id}
+        )
+
+        return JsonResponse({
+            'status': 'ok',
+            'message': 'Telegram успешно привязан' if created else 'Telegram обновлён'
+        })

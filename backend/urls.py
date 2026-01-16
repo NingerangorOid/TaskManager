@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from django.conf import settings
 from django.conf.urls.static import static
 from . import views
+from .views import TelegramLinkView
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet)
@@ -21,6 +22,7 @@ router.register(
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('telegram/link/', TelegramLinkView.as_view(), name='telegram-link'),
 ]
 
 if settings.DEBUG:

@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings  # ← будет указывать на auth.User
 
+
 class UserProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -62,3 +63,16 @@ class Attachment(models.Model):
 
     def __str__(self):
         return self.file.name
+
+
+class TelegramSubscription(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='telegram_subscription'
+    )
+    telegram_chat_id = models.CharField(max_length=100, verbose_name="ID чата в Telegram")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Telegram: {self.user.username} (chat_id={self.telegram_chat_id})"
