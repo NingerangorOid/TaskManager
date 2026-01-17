@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from django.conf import settings
 from django.conf.urls.static import static
 from . import views
-from .views import TelegramLinkView
+from .views import TelegramLinkView, LoginView, LogoutView, whoami
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet)
@@ -23,6 +23,9 @@ router.register(
 urlpatterns = [
     path('', include(router.urls)),
     path('telegram/link/', TelegramLinkView.as_view(), name='telegram-link'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('whoami/', whoami, name='whoami'),
 ]
 
 if settings.DEBUG:

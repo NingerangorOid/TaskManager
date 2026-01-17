@@ -2,11 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.views import View
 import json
@@ -47,27 +47,6 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         task = Task.objects.get(pk=self.kwargs['task_pk'])
         serializer.save(author=self.request.user, task=task)
-
-@method_decorator(csrf_exempt, name='dispatch')
-class TelegramLinkView(View):
-    def post(self, request):
-        data = json.loads(request.body)
-        token = data.get('token')  # это chat_id, который пользователь получил от бота
-        user = request.user
-
-        if not user.is_authenticated:
-            return JsonResponse({'error': 'Not authenticated'}, status=401)
-
-        # Сохраняем или обновляем
-        sub, created = TelegramSubscription.objects.update_or_create(
-            user=user,
-            defaults={'telegram_chat_id': token}
-        )
-
-        return JsonResponse({
-            'status': 'ok',
-            'message': 'Telegram успешно привязан' if created else 'Telegram обновлён'
-        })
 
 
 class AttachmentViewSet(viewsets.ModelViewSet):
@@ -140,3 +119,43 @@ class TelegramLinkView(View):
             'status': 'ok',
             'message': 'Telegram успешно привязан' if created else 'Telegram обновлён'
         })
+
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class LoginView(View):
+    def post(self, request):
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
+
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return JsonResponse({
+                'status': 'ok',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'is_staff': user.is_staff,
+                }
+            })
+        return JsonResponse({'error': 'Неверный логин или пароль'}, status=400)
+
+
+class LogoutView(View):
+    def post(self, request):
+        logout(request)
+        return JsonResponse({'status': 'ok'})
+
+
+@ensure_csrf_cookie
+def whoami(request):
+    if request.user.is_authenticated:
+        return JsonResponse({
+            'user': {
+                'id': request.user.id,
+                'username': request.user.username,
+                'is_staff': request.user.is_staff,
+            }
+        })
+    return JsonResponse({'error': 'Not authenticated'}, status=401)

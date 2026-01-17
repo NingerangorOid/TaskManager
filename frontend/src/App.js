@@ -6,21 +6,32 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import TaskDetail from './pages/TaskDetail';
+import ProtectedRoute from './components/ProtectedRoute'; // ← новый компонент
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Страницы с админ-шаблоном */}
-        <Route path="/" element={<Layout />}>
+        {/* Публичный маршрут: логин */}
+        <Route path="/login" element={<Login />} />
+
+        {/* Защищённые маршруты: обёрнуты в Layout и ProtectedRoute */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="profile" element={<Profile />} />
           <Route path="task/:id" element={<TaskDetail />} />
         </Route>
 
-        {/* Страница без шаблона */}
-        <Route path="/login" element={<Login />} />
+        {/* Перенаправление всех неизвестных путей на /login или /dashboard */}
+        <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </Router>
   );
