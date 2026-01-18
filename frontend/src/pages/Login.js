@@ -1,19 +1,67 @@
 // src/pages/Login.js
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-export default function Login() {
+const Login = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // Используем прокси — без указания хоста
+      await axios.post('/api/login/', {
+        username,
+        password
+      }, {
+        withCredentials: true
+      });
+      window.location.href = '/tasks';
+    } catch (err) {
+      setError('Неверный логин или пароль');
+    }
+  };
+
   return (
     <div className="container mt-5">
       <div className="row justify-content-center">
-        <div className="col-md-6">
+        <div className="col-md-4">
           <div className="card">
+            <div className="card-header">Вход</div>
             <div className="card-body">
-              <h2 className="text-center mb-4">Вход</h2>
-              <p>Заглушка: страница логина (ещё не реализована)</p>
+              {error && <div className="alert alert-danger">{error}</div>}
+              <form onSubmit={handleSubmit}>
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Имя пользователя"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+                <div className="mb-3">
+                  <input
+                    type="password"
+                    className="form-control"
+                    placeholder="Пароль"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary w-100">
+                  Войти
+                </button>
+              </form>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Login;

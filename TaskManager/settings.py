@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 from datetime import timedelta
+from rest_framework.settings import api_settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -125,5 +126,12 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
+api_settings.DEFAULT_AUTHENTICATION_CLASSES = [
+    'rest_framework.authentication.SessionAuthentication',
+]
+
+# Или отключаем CSRF для всех запросов (не рекомендуется)
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True

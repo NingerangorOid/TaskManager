@@ -122,6 +122,7 @@ class TelegramLinkView(View):
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(View):
     def post(self, request):
         data = json.loads(request.body)
@@ -149,6 +150,7 @@ class LogoutView(View):
 
 
 @ensure_csrf_cookie
+@csrf_exempt
 def whoami(request):
     if request.user.is_authenticated:
         return JsonResponse({
