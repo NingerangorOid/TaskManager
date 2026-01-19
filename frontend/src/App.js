@@ -1,33 +1,34 @@
-// src/App.js
+// src/App.jsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'; // ← добавили Navigate
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import Dashboard from './pages/Dashboard'; // убедись, что файл существует
 import Profile from './pages/Profile';
 import TaskDetail from './pages/TaskDetail';
-import ProtectedRoute from './components/ProtectedRoute';
+import Tasks from './pages/Tasks';
 
-function App() {
+const App = () => {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        {/* Публичный маршрут: логин */}
+        {/* Публичные маршруты */}
         <Route path="/login" element={<Login />} />
 
-        {/* Защищённые маршруты: обёрнуты в Layout и ProtectedRoute */}
-        <Route path="/" element={<Layout />} >
+        {/* Защищённые маршруты */}
+        <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="tasks" element={<Tasks />} />
           <Route path="profile" element={<Profile />} />
           <Route path="task/:id" element={<TaskDetail />} />
         </Route>
 
-        {/* Перенаправление всех неизвестных путей на /login */}
-        <Route path="*" element={<Navigate to="/login" />} />
+        {/* 404 */}
+        <Route path="*" element={<div>Страница не найдена</div>} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
-}
+};
 
 export default App;

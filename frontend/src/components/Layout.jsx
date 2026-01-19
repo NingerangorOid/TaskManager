@@ -1,9 +1,21 @@
 // src/components/Layout.jsx
 import React, { useState } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
+import axios from 'axios'; // ← просто импортируем axios
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await axios.post('/logout/'); // ← отправляем POST на /logout/
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Ошибка при выходе:', error.response || error);
+      alert('Не удалось выйти. Попробуйте позже.');
+    }
+  };
 
   return (
     <div id="wrapper">
@@ -69,11 +81,18 @@ const Layout = () => {
                   <img className="img-profile rounded-circle" src="https://via.placeholder.com/100" alt="User" />
                 </a>
                 <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in">
-                  <a className="dropdown-item" href="#">
+                  <Link className="dropdown-item" to="/profile">
                     <i className="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i> Профиль
-                  </a>
+                  </Link>
                   <div className="dropdown-divider"></div>
-                  <a className="dropdown-item" href="#">
+                  <a
+                    className="dropdown-item"
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleLogout();
+                    }}
+                  >
                     <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i> Выйти
                   </a>
                 </div>
@@ -82,7 +101,7 @@ const Layout = () => {
           </nav>
 
           <div className="container-fluid">
-            <Outlet /> {/* Здесь рендерятся дочерние страницы */}
+            <Outlet />
           </div>
         </div>
 

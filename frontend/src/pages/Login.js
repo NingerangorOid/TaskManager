@@ -12,14 +12,13 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Используем прокси — без указания хоста
-      await axios.post('/api/login/', {
+      await axios.post('/login/', {
         username,
         password
       }, {
         withCredentials: true
       });
-      window.location.href = '/tasks';
+      navigate('/tasks', { replace: true }); // ← вот так правильно
     } catch (err) {
       setError('Неверный логин или пароль');
     }
