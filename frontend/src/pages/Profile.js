@@ -1,27 +1,38 @@
 // src/pages/Profile.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import TaskList from '../components/TaskList';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/whoami/', { withCredentials: true })
-      .then(res => setUser(res.data.user))
-      .catch(console.error);
+    const fetchUser = async () => {
+      try {
+        const res = await axios.get('/whoami/');
+        setUser(res.data.user);
+      } catch (err) {
+        console.error('Не удалось загрузить профиль');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
   }, []);
 
-  if (!user) return <div>Загрузка профиля...</div>;
+  if (loading) return <div className="container mt-4">Загрузка...</div>;
 
   return (
     <div className="container mt-4">
-      <h2>Профиль</h2>
-      <p><strong>Имя:</strong> {user.username}</p>
-      <p><strong>Роль:</strong> {user.is_staff ? 'Администратор' : 'Пользователь'}</p>
-      <h3>Мои задачи</h3>
-      <TaskList filterAssigneeId={user.id} />
+      <h2>Мой профиль</h2>
+      <div className="card p-4">
+        <h5>{user.username}</h5>
+        <p><strong>ID:</strong> {user.id}</p>
+        <p><strong>Роль:</strong> {user.is_staff ? 'Администратор' : 'Пользователь'}</p>
+      </div>
     </div>
   );
 };
+
 export default Profile;

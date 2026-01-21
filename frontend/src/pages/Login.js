@@ -18,7 +18,7 @@ const Login = () => {
       }, {
         withCredentials: true
       });
-      navigate('/tasks', { replace: true }); // ← вот так правильно
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError('Неверный логин или пароль');
     }

@@ -1,4 +1,4 @@
-// src/pages/Tasks.jsx
+// src/pages/Tasks.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 const Tasks = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [assignee, setAssignee] = useState('');
+  const [assignee, setAssignee] = useState(''); // строка: ID пользователя или пусто
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const navigate = useNavigate();
@@ -18,25 +18,43 @@ const Tasks = () => {
   const fetchUsers = async () => {
     try {
       const response = await axios.get('/users/', { withCredentials: true });
-      setUsers(response.data);
+
+      let usersData;
+      if (Array.isArray(response.data)) {
+        usersData = response.data;
+      } else {
+        usersData = response.data.results || [];
+      }
+
+      setUsers(usersData);
     } catch (err) {
-      console.error('Ошибка при загрузке пользователей');
+      console.error('Ошибка при загрузке пользователей:', err);
+      setError('Не удалось загрузить список пользователей');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
     try {
-      const response = await axios.post('/tasks/', {
-        title,
-        description,
-        assignee: assignee || null,
-      }, {
-        withCredentials: true,
-      });
+      // Преобразуем строку в число или null
+      const assigneeId = assignee ? Number(assignee) : null;
+
+      const response = await axios.post(
+        '/tasks/',
+        {
+          title,
+          description,
+          assignee_id: assigneeId, // ← именно assignee_id!
+        },
+        { withCredentials: true }
+      );
+
       navigate(`/task/${response.data.id}`);
     } catch (err) {
-      setError('Не удалось создать задачу');
+      console.error('Ошибка создания задачи:', err);
+      setError('Не удалось создать задачу. Проверьте данные.');
     }
   };
 
@@ -46,8 +64,9 @@ const Tasks = () => {
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
-          <label>Заголовок</label>
+          <label htmlFor="title" className="form-label">Заголовок</label>
           <input
+            id="title"
             type="text"
             className="form-control"
             value={title}
@@ -56,8 +75,9 @@ const Tasks = () => {
           />
         </div>
         <div className="mb-3">
-          <label>Описание</label>
+          <label htmlFor="description" className="form-label">Описание</label>
           <textarea
+            id="description"
             className="form-control"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -65,14 +85,15 @@ const Tasks = () => {
           />
         </div>
         <div className="mb-3">
-          <label>Исполнитель</label>
+          <label htmlFor="assignee" className="form-label">Исполнитель</label>
           <select
+            id="assignee"
             className="form-select"
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
           >
             <option value="">Не назначен</option>
-            {users.map(user => (
+            {Array.isArray(users) && users.map(user => (
               <option key={user.id} value={user.id}>
                 {user.username}
               </option>

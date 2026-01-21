@@ -1,95 +1,88 @@
-// src/pages/TaskDetail.jsx
+// src/pages/TaskDetail.js
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { useParams, useNavigate } from 'react-router-dom';
+import TaskCard from '../components/TaskCard';
 
 const TaskDetail = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [task, setTask] = useState(null);
   const [comments, setComments] = useState([]);
-  const [attachments, setAttachments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const loadTaskAndComments = async () => {
+    try {
+      setLoading(true);
+      const [taskRes, commentsRes] = await Promise.all([
+        axios.get(`/tasks/${id}/`),
+        axios.get(`/tasks/${id}/comments/`)
+      ]);
+
+      // Проверяем, есть ли пагинация у комментариев
+      let commentsData;
+      if (Array.isArray(commentsRes.data)) {
+        commentsData = commentsRes.data;
+      } else {
+        commentsData = commentsRes.data.results || [];
+      }
+
+      setTask(taskRes.data);
+      setComments(commentsData);
+    } catch (err) {
+      console.error('Ошибка загрузки задачи или комментариев:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchTask();
-    fetchComments();
-    fetchAttachments();
+    loadTaskAndComments();
   }, [id]);
 
-  const fetchTask = async () => {
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
     try {
-      const response = await axios.get(`/tasks/${id}/`, { withCredentials: true });
-      setTask(response.data);
+      await axios.post(`/tasks/${id}/comments/`, { text: newComment });
+      setNewComment('');
+      loadTaskAndComments(); // Обновляем список комментариев
     } catch (err) {
-      console.error('Ошибка при загрузке задачи');
+      console.error('Ошибка добавления комментария:', err);
     }
   };
 
-  const fetchComments = async () => {
-    try {
-      const response = await axios.get(`/tasks/${id}/comments/`, { withCredentials: true });
-      setComments(response.data);
-    } catch (err) {
-      console.error('Ошибка при загрузке комментариев');
-      setComments([]);
-    }
-  };
-
-  const fetchAttachments = async () => {
-    try {
-      const response = await axios.get(`/tasks/${id}/attachments/`, { withCredentials: true });
-      setAttachments(response.data);
-    } catch (err) {
-      console.error('Ошибка при загрузке вложений');
-      setAttachments([]);
-    }
-  };
-
-  if (!task) return <div>Загрузка...</div>;
+  if (loading) return <div className="container mt-4">Загрузка...</div>;
+  if (!task) return <div className="container mt-4">Задача не найдена</div>;
 
   return (
     <div className="container mt-4">
-      <h2>{task.title}</h2>
-      <p>{task.description}</p>
+      <TaskCard task={task} />
+
+      <h4 className="mt-4">Комментарии</h4>
       <div className="mb-3">
-        <strong>Статус:</strong> {task.status}
+        <textarea
+          className="form-control"
+          rows="3"
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          placeholder="Напишите комментарий..."
+        />
+        <button className="btn btn-primary mt-2" onClick={handleAddComment}>
+          Добавить
+        </button>
       </div>
-      <div className="mb-3">
-        <strong>Исполнитель:</strong> {task.assignee?.username || 'Не назначен'}
-      </div>
 
-      <h3>Комментарии ({comments.length})</h3>
-      {comments.length > 0 ? (
-        <ul className="list-group">
-          {comments.map(comment => (
-            <li key={comment.id} className="list-group-item">
-              <p>{comment.text}</p>
-              <small>Автор: {comment.author.username}</small>
-            </li>
-          ))}
-        </ul>
+      {Array.isArray(comments) && comments.length === 0 ? (
+        <p>Комментариев пока нет.</p>
       ) : (
-        <p>Нет комментариев</p>
+        Array.isArray(comments) && comments.map(comment => (
+          <div key={comment.id} className="list-group-item mb-2">
+            <div><strong>{comment.author.username}</strong></div>
+            <div>{comment.text}</div>
+            <small className="text-muted">{new Date(comment.created_at).toLocaleString()}</small>
+          </div>
+        ))
       )}
-
-      <h3>Вложения ({attachments.length})</h3>
-      {attachments.length > 0 ? (
-        <ul className="list-group">
-          {attachments.map(att => (
-            <li key={att.id} className="list-group-item">
-              {att.file_name}
-              <br />
-              <small>Загрузил: {att.uploaded_by.username}</small>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>Нет вложений</p>
-      )}
-
-      <button className="btn btn-secondary mt-3" onClick={() => navigate(-1)}>
-        Назад
-      </button>
     </div>
   );
 };
