@@ -1,22 +1,28 @@
+# backend/serializers.py
 from rest_framework import serializers
 from django.utils.crypto import get_random_string
 from .models import Task, Comment, Attachment
-from django.contrib.auth.models import User  # ← вот так правильно!
-
+from django.contrib.auth.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'is_superuser']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_superuser']
         read_only_fields = ['is_superuser']
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    assignee = UserSerializer(read_only=True)
     author = UserSerializer(read_only=True)
+    assignee = UserSerializer(read_only=True)
+
+    # Поле для записи assignee (принимает ID пользователя)
     assignee_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), write_only=True, source='assignee'
+        queryset=User.objects.all(),
+        write_only=True,
+        allow_null=True,
+        required=False,
+        source='assignee'  # Сохраняет в поле assignee модели
     )
 
     class Meta:
@@ -25,9 +31,13 @@ class TaskSerializer(serializers.ModelSerializer):
         read_only_fields = ['author', 'created_at', 'updated_at']
 
     def validate_assignee_id(self, value):
-        if not value.is_active:
+        if value and not value.is_active:
             raise serializers.ValidationError("Нельзя назначить задачу неактивному пользователю.")
         return value
+
+    def create(self, validated_data):
+        validated_data['author'] = self.context['request'].user
+        return super().create(validated_data)
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -35,14 +45,15 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = '__all__'
-        read_only_fields = ['author']
+        fields = ['id', 'text', 'author', 'created_at']
+        read_only_fields = ['author', 'created_at']
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attachment
-        fields = ['id', 'file_name', 'created_at']
+        fields = ['id', 'file', 'uploaded_at']
+        read_only_fields = ['uploaded_at']
 
 
 class TelegramTokenSerializer(serializers.Serializer):

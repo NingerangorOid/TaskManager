@@ -1,9 +1,11 @@
 from pathlib import Path
 import os
 from datetime import timedelta
-from rest_framework.settings import api_settings
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+TELEGRAM_BOT_TOKEN = '8545864471:AAFujpb6x5-Yk9G1RFSHIQeNW7mFqU8ogYY'
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-keep-it-secret')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
@@ -54,11 +56,6 @@ DATABASES = {
     }
 }
 
-
-
-# Templates
-# settings.py
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -105,7 +102,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
 }
+
 
 # === JWT ===
 SIMPLE_JWT = {
@@ -122,16 +122,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# CSRF
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
-api_settings.DEFAULT_AUTHENTICATION_CLASSES = [
-    'rest_framework.authentication.SessionAuthentication',
-]
-
-# Или отключаем CSRF для всех запросов (не рекомендуется)
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Или отключаем CSRF для всех запросов (не рекомендуется)

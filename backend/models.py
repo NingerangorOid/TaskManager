@@ -1,5 +1,7 @@
+# backend/models.py
 from django.db import models
 from django.conf import settings  # ← будет указывать на auth.User
+import secrets
 
 
 class UserProfile(models.Model):
@@ -8,7 +10,14 @@ class UserProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='profile'
     )
-    telegram_token = models.CharField(max_length=100, blank=True, null=True)
+    telegram_chat_id = models.CharField(max_length=100, blank=True, null=True)
+    telegram_token = models.CharField(max_length=100, blank=True, null=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        if not self.telegram_token:
+            # Генерируем токен: 8 случайных символов (без спецсимволов)
+            self.telegram_token = secrets.token_urlsafe(8)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Profile of {self.user.username}"

@@ -1,97 +1,122 @@
-# backend/bot.py
+# bot/bot.py
 import os
+import sys
 import asyncio
+import django
+from asgiref.sync import sync_to_async
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message
 
-# Настройка Django (для доступа к моделям)
+# === 1. Добавляем корень проекта в PYTHONPATH ===
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+# === 2. Настройка Django ===
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'TaskManager.settings')
+
 try:
-    from django.conf import settings
-    from django.core.wsgi import get_wsgi_application
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'TaskManager.settings')
-    application = get_wsgi_application()
-    from backend.models import TelegramSubscription
+    django.setup()
+    from backend.models import UserProfile
     DJANGO_AVAILABLE = True
-except Exception:
+    print("Django успешно инициализирован")
+except Exception as e:
+    print("WARNING: Не удалось инициализировать Django:", str(e))
     DJANGO_AVAILABLE = False
 
+# === 3. Токен бота ===
+BOT_TOKEN = "8545864471:AAFujpb6x5-Yk9G1RFSHIQeNW7mFqU8ogYY"
 
-# Получаем токен из настроек или .env
-def get_bot_token():
-    if DJANGO_AVAILABLE:
-        return getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
-    return os.getenv('TELEGRAM_BOT_TOKEN')
+if not BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN не задан!")
 
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-# Инициализация бота
-bot = None
-dp = None
+# === 4. Команды бота ===
 
-def get_bot_instance():
-    global bot, dp
-    if bot is None:
-        token = get_bot_token()
-        if not token:
-            raise ValueError("TELEGRAM_BOT_TOKEN не задан в settings.py или .env")
-        bot = Bot(token=token)
-        dp = Dispatcher()
-        # Регистрируем команду /start
-        dp.message.register(start_command, Command("start"))
-    return bot, dp
-
-
+@dp.message(Command("start"))
 async def start_command(message: types.Message):
-    """Обработка команды /start"""
     user = message.from_user
-    chat_id = str(message.chat.id)
     await message.answer(
         f"Привет, {user.first_name}!\n"
-        f"Твой chat_id: {chat_id}\n"
-        "Скопируй его и введи в профиле TaskManager."
+        "Я — бот TaskManager.\n"
+        "Чтобы привязать аккаунт, отправь мне свой токен из профиля.\n"
+        "Если его нет — создай нового пользователя в админке.\n"
+        f"Твой chat_id: {message.chat.id}"
     )
 
+@dp.message(Command("link"))
+async def link_command(message: types.Message):
+    await message.answer(
+        "Чтобы привязать аккаунт:\n"
+        "1. Зайди в профиль в TaskManager\n"
+        "2. Скопируй свой токен\n"
+        "3. Отправь его мне как обычное сообщение (не команду)\n"
+        "После этого я начну присылать уведомления о задачах!"
+    )
 
-# === ФУНКЦИЯ ДЛЯ УВЕДОМЛЕНИЙ ИЗ DRF/SIGNALS ===
-def notify_user_about_task(user_id: int, message: str):
-    """
-    Вызывается из signals.py или views.py.
-    Отправляет уведомление пользователю в Telegram.
-    """
+@dp.message(Command("unlink"))
+async def unlink_command(message: types.Message):
     if not DJANGO_AVAILABLE:
-        print("Django не доступен — уведомление не отправлено")
-        return False
-
-    try:
-        sub = TelegramSubscription.objects.get(user_id=user_id)
-        bot, _ = get_bot_instance()
-
-        # Запускаем асинхронную отправку в синхронном контексте
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        success = loop.run_until_complete(bot.send_message(chat_id=sub.telegram_chat_id, text=message))
-        loop.close()
-        return True
-    except TelegramSubscription.DoesNotExist:
-        return False  # Пользователь не подписан
-    except Exception as e:
-        print(f"Ошибка отправки уведомления: {e}")
-        return False
-
-
-# === ЗАПУСК БОТА (только отдельно!) ===
-async def run_bot():
-    """Запуск бота в режиме polling"""
-    token = get_bot_token()
-    if not token:
-        print("Ошибка: TELEGRAM_BOT_TOKEN не задан!")
+        await message.answer("Бот не подключён к базе данных.")
         return
 
-    bot, dp = get_bot_instance()
-    print("Telegram-бот на aiogram запущен...")
+    chat_id = str(message.chat.id)
+    try:
+        profile = await sync_to_async(
+            lambda: UserProfile.objects.filter(telegram_chat_id=chat_id).first()
+        )()
+
+        if not profile:
+            await message.answer("Вы не привязаны ни к одному аккаунту.")
+            return
+
+        profile.telegram_chat_id = None
+        await sync_to_async(profile.save)()
+        await message.answer("Аккаунт отвязан. Уведомления больше не будут приходить.")
+    except Exception as e:
+        await message.answer("Произошла ошибка. Попробуйте позже.")
+        print("Ошибка отвязки:", str(e))
+
+@dp.message()
+async def handle_telegram_token(message: types.Message):
+    if not DJANGO_AVAILABLE:
+        return
+
+    text = message.text.strip()
+    if len(text) < 4 or ' ' in text:
+        # Это не токен — игнорируем
+        await message.answer("Не понял. Введите команду или токен.")
+        return
+
+    try:
+        profile = await sync_to_async(
+            lambda: UserProfile.objects.filter(telegram_token=text).first()
+        )()
+
+        if not profile:
+            await message.answer(
+                "Неверный токен.\n"
+                "Проверьте, правильно ли скопировали токен из профиля."
+            )
+            return
+
+        profile.telegram_chat_id = str(message.chat.id)
+        await sync_to_async(profile.save)()
+        await message.answer(
+            "Аккаунт успешно привязан!\n"
+            "Теперь вы будете получать уведомления о задачах."
+        )
+    except Exception as e:
+        await message.answer("Произошла ошибка. Попробуйте позже.")
+        print("Ошибка обработки токена:", str(e))
+
+# === 5. Запуск бота ===
+async def main():
+    print("Бот Telegram запущен...")
     await dp.start_polling(bot)
 
-
-# === Точка входа для запуска отдельно ===
 if __name__ == "__main__":
-    asyncio.run(run_bot())
+    asyncio.run(main())

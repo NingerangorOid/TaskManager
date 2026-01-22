@@ -1,11 +1,13 @@
+# backend/views.py
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view
 from django.http import JsonResponse
+from rest_framework.pagination import PageNumberPagination
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -17,32 +19,53 @@ from .serializers import (UserSerializer, TaskSerializer, CommentSerializer,
 User = get_user_model()
 
 
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by('username')
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
 
 
 class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
     queryset = Task.objects.all()
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         user = self.request.user
-        return Task.objects.filter(author=user) | Task.objects.filter(assignee=user)
+        if user.is_staff:
+            return Task.objects.all().extra(
+                select={'is_mine': "author_id = %s OR assignee_id = %s"},
+                select_params=[user.id, user.id]
+            ).order_by('-is_mine', '-created_at')
+        else:
+            return Task.objects.filter(author=user) | Task.objects.filter(assignee=user)
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        # Получаем assignee_id из validated_data
+        assignee = serializer.validated_data.get('assignee')
+        serializer.save(author=self.request.user, assignee=assignee)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
-
+    pagination_class = None
 
     def get_queryset(self):
-        return Comment.objects.filter(task_id=self.kwargs['task_pk'])
+        return Comment.objects.filter(task_id=self.kwargs['task_pk']).order_by('-created_at')
 
     def perform_create(self, serializer):
         task = Task.objects.get(pk=self.kwargs['task_pk'])
@@ -52,19 +75,15 @@ class CommentViewSet(viewsets.ModelViewSet):
 class AttachmentViewSet(viewsets.ModelViewSet):
     serializer_class = AttachmentSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         return Attachment.objects.filter(task_id=self.kwargs['task_pk'])
 
     def perform_create(self, serializer):
-        # Заглушка: реальная загрузка файлов — позже
         task = Task.objects.get(pk=self.kwargs['task_pk'])
-        serializer.save(
-            task=task,
-            uploaded_by=self.request.user,
-            file_name='placeholder.txt',
-            file_path='/uploads/placeholder.txt'
-        )
+        # Убираем uploaded_by — его нет в модели
+        serializer.save(task=task)
 
 
 class ProfileViewSet(viewsets.ViewSet):
@@ -82,11 +101,9 @@ def demo_login(request):
     username = 'admin'
     password = 'admin123'
 
-    # Создаём пользователя, если его нет
     if not User.objects.filter(username=username).exists():
         User.objects.create_superuser(username, 'admin@example.com', password)
 
-    # Получаем JWT-токен
     user = User.objects.get(username=username)
     refresh = RefreshToken.for_user(user)
 
@@ -100,7 +117,7 @@ def demo_login(request):
 class TelegramLinkView(View):
     def post(self, request):
         data = json.loads(request.body)
-        chat_id = data.get('chat_id')  # ← имя поля должно совпадать с тем, что шлёт фронт
+        chat_id = data.get('chat_id')
         user = request.user
 
         if not user.is_authenticated:
@@ -109,7 +126,6 @@ class TelegramLinkView(View):
         if not chat_id:
             return JsonResponse({'error': 'chat_id is required'}, status=400)
 
-        # Сохраняем или обновляем
         sub, created = TelegramSubscription.objects.update_or_create(
             user=user,
             defaults={'telegram_chat_id': chat_id}
@@ -144,6 +160,8 @@ class LoginView(View):
 
 
 class LogoutView(View):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         logout(request)
         return JsonResponse({'status': 'ok'})
