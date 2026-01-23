@@ -22,16 +22,16 @@ def get_bot():
         _thread.start()
     return _bot_instance
 
+
 def send_telegram_notification(chat_id: str, message: str):
     """Вызывается из сигналов"""
     try:
         bot = get_bot()
-        # Отправляем асинхронно в работающем event loop
         future = asyncio.run_coroutine_threadsafe(
             bot.send_message(chat_id=chat_id, text=message),
             _loop
         )
-        result = future.result(timeout=10)  # Ждём ответа 10 секунд
+        result = future.result(timeout=10)
         return True
     except Exception as e:
         print("Error sending Telegram notification:", str(e))

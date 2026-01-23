@@ -2,6 +2,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -51,6 +52,13 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Получаем assignee_id из validated_data
         assignee = serializer.validated_data.get('assignee')
+
+        # Запрет: обычный пользователь не может назначать задачу админу
+        if assignee and assignee.is_staff and not self.request.user.is_staff:
+            raise serializers.ValidationError({
+                'assignee': 'Вы не можете назначать задачи администраторам.'
+            })
+
         serializer.save(author=self.request.user, assignee=assignee)
 
     def destroy(self, request, *args, **kwargs):
@@ -82,7 +90,6 @@ class AttachmentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         task = Task.objects.get(pk=self.kwargs['task_pk'])
-        # Убираем uploaded_by — его нет в модели
         serializer.save(task=task)
 
 

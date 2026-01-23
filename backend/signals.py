@@ -2,13 +2,8 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from django.apps import apps
 from .models import UserProfile, Task, Comment, Attachment
 from .notifications import send_telegram_notification
-
-# Явный импорт модели
-Comment = apps.get_model('backend', 'Comment')
-print(f"Модель Comment загружена: {Comment}")
 
 # === Создание профиля при создании пользователя ===
 @receiver(post_save, sender=User)
@@ -28,12 +23,17 @@ def notify_on_task_change(sender, instance, created, **kwargs):
             print("У пользователя нет telegram_chat_id")
             return
 
+        # Подсчитываем вложения
+        attachment_count = instance.attachments.count()
+        attachment_text = f"📎 {attachment_count} вложение(я)" if attachment_count > 0 else ""
+
         if created:
             msg = (
-                f"Новая задача!\n"
+                f"✅ Новая задача!\n"
                 f"Название: {instance.title}\n"
                 f"Описание: {instance.description or '-'}\n"
-                f"Статус: {instance.get_status_display()}"
+                f"Статус: {instance.get_status_display()}\n"
+                f"{attachment_text}"
             )
         else:
             try:
@@ -53,12 +53,12 @@ def notify_on_task_change(sender, instance, created, **kwargs):
                     )
             except Task.DoesNotExist:
                 msg = (
-                    f"️Задача обновлена!\n"
+                    f"Задача обновлена!\n"
                     f"Название: {instance.title}\n"
                     f"Статус: {instance.get_status_display()}"
                 )
 
-        print(f" Отправляем уведомление на chat_id: {profile.telegram_chat_id}")
+        print(f"Отправляем уведомление на chat_id: {profile.telegram_chat_id}")
         send_telegram_notification(profile.telegram_chat_id, msg)
     except UserProfile.DoesNotExist:
         pass
@@ -83,7 +83,7 @@ def notify_on_comment(sender, instance, created, **kwargs):
             return
 
         msg = (
-            f" Новый комментарий!\n"
+            f"💬 Новый комментарий!\n"
             f"Задача: {task.title}\n"
             f"Автор: {instance.author.username}\n"
             f"Текст: {instance.text[:100]}{'...' if len(instance.text) > 100 else ''}"
@@ -95,39 +95,6 @@ def notify_on_comment(sender, instance, created, **kwargs):
         pass
     except Exception as e:
         print("Ошибка уведомления о комментарии:", str(e))
-
-# === Уведомления о вложениях ===
-@receiver(post_save, sender=Attachment)
-def notify_on_attachment(sender, instance, created, **kwargs):
-    if not created:
-        return
-
-    task = instance.task
-    assignee = task.assignee
-    if not assignee:
-        return
-
-    try:
-        profile = UserProfile.objects.get(user=assignee)
-        if not profile.telegram_chat_id:
-            print("У пользователя нет telegram_chat_id")
-            return
-
-        file_name = instance.file.name.split('/')[-1]
-
-        msg = (
-            f"📎 Новое вложение!\n"
-            f"Задача: {task.title}\n"
-            f"Файл: {file_name}\n"
-            f"Добавил: {instance.task.author.username}"
-        )
-
-        print(f"Отправляем уведомление на chat_id: {profile.telegram_chat_id}")
-        send_telegram_notification(profile.telegram_chat_id, msg)
-    except UserProfile.DoesNotExist:
-        pass
-    except Exception as e:
-        print("Ошибка уведомления о вложении:", str(e))
 
 # === Уведомления об удалении задачи ===
 @receiver(post_delete, sender=Task)
@@ -142,7 +109,7 @@ def notify_on_task_delete(sender, instance, **kwargs):
             return
 
         msg = (
-            f"🗑Задача удалена!\n"
+            f"🗑 Задача удалена!\n"
             f"Название: {instance.title}\n"
             f"Статус: {instance.get_status_display()}"
         )
@@ -153,3 +120,32 @@ def notify_on_task_delete(sender, instance, **kwargs):
         pass
     except Exception as e:
         print("Ошибка уведомления об удалении задачи:", str(e))
+
+
+@receiver(post_save, sender=Attachment)
+def notify_on_attachment(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    task = instance.task
+    assignee = task.assignee
+    if not assignee:
+        return
+
+    try:
+        profile = UserProfile.objects.get(user=assignee)
+        if not profile.telegram_chat_id:
+            print("❌ У пользователя нет telegram_chat_id")
+            return
+
+        msg = (
+            f"📎 К задаче «{task.title}» прикреплён файл.\n"
+            f"Файл: {instance.file.name.split('/')[-1]}"
+        )
+
+        print(f"Отправляем уведомление на chat_id: {profile.telegram_chat_id}")
+        send_telegram_notification(profile.telegram_chat_id, msg)
+    except UserProfile.DoesNotExist:
+        pass
+    except Exception as e:
+        print("Ошибка уведомления о вложении:", str(e))

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import TaskCard from '../components/TaskCard';
+import AttachmentList from '../components/AttachmentList';
 
 const TaskDetail = () => {
   const { id } = useParams();
@@ -19,7 +20,6 @@ const TaskDetail = () => {
         axios.get(`/tasks/${id}/comments/`)
       ]);
 
-      // Проверяем, есть ли пагинация у комментариев
       let commentsData;
       if (Array.isArray(commentsRes.data)) {
         commentsData = commentsRes.data;
@@ -45,7 +45,7 @@ const TaskDetail = () => {
     try {
       await axios.post(`/tasks/${id}/comments/`, { text: newComment });
       setNewComment('');
-      loadTaskAndComments(); // Обновляем список комментариев
+      loadTaskAndComments();
     } catch (err) {
       console.error('Ошибка добавления комментария:', err);
     }
@@ -57,6 +57,9 @@ const TaskDetail = () => {
   return (
     <div className="container mt-4">
       <TaskCard task={task} />
+
+      {/* Вложения */}
+      <AttachmentList taskId={id} />
 
       <h4 className="mt-4">Комментарии</h4>
       <div className="mb-3">

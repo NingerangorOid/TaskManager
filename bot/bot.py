@@ -8,12 +8,11 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message
 
-# === 1. Добавляем корень проекта в PYTHONPATH ===
+# === Настройка пути и Django ===
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-# === 2. Настройка Django ===
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'TaskManager.settings')
 
 try:
@@ -25,7 +24,6 @@ except Exception as e:
     print("WARNING: Не удалось инициализировать Django:", str(e))
     DJANGO_AVAILABLE = False
 
-# === 3. Токен бота ===
 BOT_TOKEN = "8545864471:AAFujpb6x5-Yk9G1RFSHIQeNW7mFqU8ogYY"
 
 if not BOT_TOKEN:
@@ -34,51 +32,78 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# === 4. Команды бота ===
+
+# === Синхронные функции для ORM (с select_related) ===
+
+@sync_to_async
+def get_profile_by_chat_id(chat_id):
+    return UserProfile.objects.select_related('user').filter(telegram_chat_id=chat_id).first()
+
+@sync_to_async
+def get_profile_by_token(token):
+    return UserProfile.objects.select_related('user').filter(telegram_token=token).first()
+
+@sync_to_async
+def save_profile(profile):
+    profile.save()
+
+
+# === Команды ===
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
-    user = message.from_user
     await message.answer(
-        f"Привет, {user.first_name}!\n"
-        "Я — бот TaskManager.\n"
-        "Чтобы привязать аккаунт, отправь мне свой токен из профиля.\n"
-        "Если его нет — создай нового пользователя в админке.\n"
-        f"Твой chat_id: {message.chat.id}"
+        "Привет! Я - бот TaskManager.\n\n"
+        "Доступные команды:\n"
+        "/link - привязать аккаунт по токену\n"
+        "/show - показать привязанный аккаунт\n"
+        "/unlink - отвязать аккаунт"
     )
 
 @dp.message(Command("link"))
 async def link_command(message: types.Message):
-    await message.answer(
-        "Чтобы привязать аккаунт:\n"
-        "1. Зайди в профиль в TaskManager\n"
-        "2. Скопируй свой токен\n"
-        "3. Отправь его мне как обычное сообщение (не команду)\n"
-        "После этого я начну присылать уведомления о задачах!"
-    )
+    if not DJANGO_AVAILABLE:
+        await message.answer("Бот не подключён к базе данных.")
+        return
+
+    chat_id = str(message.chat.id)
+    existing_profile = await get_profile_by_chat_id(chat_id)
+    if existing_profile:
+        await message.answer(
+            f"Вы уже привязаны к аккаунту {existing_profile.user.username}.\n"
+            "Сначала отвяжитесь с помощью /unlink, затем повторите попытку."
+        )
+    else:
+        await message.answer(
+            "Отправьте свой код-токен из профиля TaskManager.\n"
+            "Пример: aBcDeFgH"
+        )
+
+@dp.message(Command("show"))
+async def show_command(message: types.Message):
+    if not DJANGO_AVAILABLE:
+        await message.answer("Бот не подключён к базе данных.")
+        return
+    chat_id = str(message.chat.id)
+    profile = await get_profile_by_chat_id(chat_id)
+    if profile:
+        await message.answer(f"Вы привязаны к аккаунту: {profile.user.username}")
+    else:
+        await message.answer("Вы не привязаны. Используйте /link")
 
 @dp.message(Command("unlink"))
 async def unlink_command(message: types.Message):
     if not DJANGO_AVAILABLE:
         await message.answer("Бот не подключён к базе данных.")
         return
-
     chat_id = str(message.chat.id)
-    try:
-        profile = await sync_to_async(
-            lambda: UserProfile.objects.filter(telegram_chat_id=chat_id).first()
-        )()
-
-        if not profile:
-            await message.answer("Вы не привязаны ни к одному аккаунту.")
-            return
-
+    profile = await get_profile_by_chat_id(chat_id)
+    if profile:
         profile.telegram_chat_id = None
-        await sync_to_async(profile.save)()
-        await message.answer("Аккаунт отвязан. Уведомления больше не будут приходить.")
-    except Exception as e:
-        await message.answer("Произошла ошибка. Попробуйте позже.")
-        print("Ошибка отвязки:", str(e))
+        await save_profile(profile)
+        await message.answer("Аккаунт отвязан.")
+    else:
+        await message.answer("Вы не привязаны.")
 
 @dp.message()
 async def handle_telegram_token(message: types.Message):
@@ -86,34 +111,36 @@ async def handle_telegram_token(message: types.Message):
         return
 
     text = message.text.strip()
-    if len(text) < 4 or ' ' in text:
-        # Это не токен — игнорируем
-        await message.answer("Не понял. Введите команду или токен.")
+    if not text or len(text) < 4 or text.startswith('/'):
         return
 
-    try:
-        profile = await sync_to_async(
-            lambda: UserProfile.objects.filter(telegram_token=text).first()
-        )()
+    chat_id = str(message.chat.id)
 
-        if not profile:
-            await message.answer(
-                "Неверный токен.\n"
-                "Проверьте, правильно ли скопировали токен из профиля."
-            )
-            return
-
-        profile.telegram_chat_id = str(message.chat.id)
-        await sync_to_async(profile.save)()
+    # Проверяем, не привязан ли уже этот чат
+    existing_profile = await get_profile_by_chat_id(chat_id)
+    if existing_profile:
         await message.answer(
-            "Аккаунт успешно привязан!\n"
-            "Теперь вы будете получать уведомления о задачах."
+            f"Вы уже привязаны к аккаунту {existing_profile.user.username}. "
+            "Сначала отвяжитесь с помощью /unlink, затем повторите попытку."
         )
-    except Exception as e:
-        await message.answer("Произошла ошибка. Попробуйте позже.")
-        print("Ошибка обработки токена:", str(e))
+        return
 
-# === 5. Запуск бота ===
+    # Ищем профиль по токену
+    profile = await get_profile_by_token(text)
+    if not profile:
+        await message.answer("Неверный токен.")
+        return
+
+    # Привязываем
+    profile.telegram_chat_id = chat_id
+    await save_profile(profile)
+    await message.answer(
+        f"Аккаунт {profile.user.username} успешно привязан!\n"
+        "Теперь вы будете получать уведомления о задачах."
+    )
+
+
+# === Запуск ===
 async def main():
     print("Бот Telegram запущен...")
     await dp.start_polling(bot)

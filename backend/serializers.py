@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_superuser']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_superuser', 'is_staff']
         read_only_fields = ['is_superuser']
 
 
@@ -24,6 +24,11 @@ class TaskSerializer(serializers.ModelSerializer):
         required=False,
         source='assignee'  # Сохраняет в поле assignee модели
     )
+    attachments = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Task
@@ -36,8 +41,15 @@ class TaskSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        attachments = validated_data.pop('attachments', [])
         validated_data['author'] = self.context['request'].user
-        return super().create(validated_data)
+        task = super().create(validated_data)
+
+        # Сохраняем вложения
+        for file in attachments:
+            Attachment.objects.create(task=task, file=file)
+
+        return task
 
 
 class CommentSerializer(serializers.ModelSerializer):
