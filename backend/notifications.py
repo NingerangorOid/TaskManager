@@ -22,7 +22,6 @@ def get_bot():
         _thread.start()
     return _bot_instance
 
-
 def send_telegram_notification(chat_id: str, message: str):
     """Вызывается из сигналов"""
     try:

@@ -40,6 +40,13 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Нельзя назначить задачу неактивному пользователю.")
         return value
 
+    def validate_status(self, value):
+        valid_statuses = ['new', 'in_progress', 'done', 'canceled', 'urgent']
+        if value not in valid_statuses:
+            raise serializers.ValidationError("Неверный статус.")
+        return value
+
+
     def create(self, validated_data):
         attachments = validated_data.pop('attachments', [])
         validated_data['author'] = self.context['request'].user

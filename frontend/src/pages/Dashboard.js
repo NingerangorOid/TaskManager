@@ -6,34 +6,33 @@ import TaskCard from '../components/TaskCard';
 const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [canManage, setCanManage] = useState(false); // ← новое имя
   const [nextPage, setNextPage] = useState(null);
   const [prevPage, setPrevPage] = useState(null);
-  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
-  const [currentPageUrl, setCurrentPageUrl] = useState('/tasks/'); // ← текущий URL страницы
+  const [currentPageUrl, setCurrentPageUrl] = useState('/tasks/'); // ← исправлен URL
 
   const fetchTasksAndUser = async (url = '/tasks/') => {
     try {
       setLoading(true);
       const [tasksRes, userRes] = await Promise.all([
-        axios.get(url),
-        axios.get('/whoami/')
+        axios.get(url, { withCredentials: true }),
+        axios.get('/whoami/', { withCredentials: true })
       ]);
 
-      // Пагинация включена → ожидаем объект с results
       if (tasksRes.data.results !== undefined) {
         setTasks(tasksRes.data.results);
         setNextPage(tasksRes.data.next);
         setPrevPage(tasksRes.data.previous);
         setCurrentPageUrl(url);
       } else {
-        // Без пагинации — просто массив
         setTasks(tasksRes.data);
         setNextPage(null);
         setPrevPage(null);
         setCurrentPageUrl('/tasks/');
       }
 
-      setCurrentUserIsAdmin(userRes.data.user.is_staff);
+      const user = userRes.data.user;
+      setCanManage(user.is_staff || user.is_superuser); // ← staff + superuser
     } catch (err) {
       console.error('Ошибка загрузки задач или профиля:', err);
       setTasks([]);
@@ -48,7 +47,6 @@ const Dashboard = () => {
     fetchTasksAndUser();
   }, []);
 
-  // Перезагружаем текущую страницу после удаления
   const handleTaskDeleted = () => {
     fetchTasksAndUser(currentPageUrl);
   };
@@ -66,8 +64,8 @@ const Dashboard = () => {
           <TaskCard
             key={task.id}
             task={task}
-            current_user_is_admin={currentUserIsAdmin}
-            onTaskDeleted={handleTaskDeleted} // ← перезагружает текущую страницу
+            canManage={canManage} // ← передаём единый флаг
+            onTaskDeleted={handleTaskDeleted}
           />
         ))
       )}

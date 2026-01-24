@@ -36,24 +36,18 @@ def notify_on_task_change(sender, instance, created, **kwargs):
                 f"{attachment_text}"
             )
         else:
-            try:
-                old_instance = Task.objects.get(pk=instance.pk)
-                if old_instance.status != instance.status:
-                    msg = (
-                        f"Статус задачи изменён!\n"
-                        f"Задача: {instance.title}\n"
-                        f"Старый статус: {old_instance.get_status_display()}\n"
-                        f"Новый статус: {instance.get_status_display()}"
-                    )
-                else:
-                    msg = (
-                        f"Задача обновлена!\n"
-                        f"Название: {instance.title}\n"
-                        f"Статус: {instance.get_status_display()}"
-                    )
-            except Task.DoesNotExist:
+            # Проверяем, изменился ли статус
+            old_instance = Task.objects.get(pk=instance.pk)
+            if old_instance.status != instance.status:
                 msg = (
-                    f"Задача обновлена!\n"
+                    f"🔄 Статус задачи изменён!\n"
+                    f"Задача: {instance.title}\n"
+                    f"Старый статус: {old_instance.get_status_display()}\n"
+                    f"Новый статус: {instance.get_status_display()}"
+                )
+            else:
+                msg = (
+                    f"📝 Задача обновлена!\n"
                     f"Название: {instance.title}\n"
                     f"Статус: {instance.get_status_display()}"
                 )
@@ -111,17 +105,17 @@ def notify_on_task_delete(sender, instance, **kwargs):
         msg = (
             f"🗑 Задача удалена!\n"
             f"Название: {instance.title}\n"
-            f"Статус: {instance.get_status_display()}"
+            # f"Статус: {instance.get_status_display()}"
         )
 
-        print(f"✅ Отправляем уведомление на chat_id: {profile.telegram_chat_id}")
+        print(f"Отправляем уведомление на chat_id: {profile.telegram_chat_id}")
         send_telegram_notification(profile.telegram_chat_id, msg)
     except UserProfile.DoesNotExist:
         pass
     except Exception as e:
         print("Ошибка уведомления об удалении задачи:", str(e))
 
-
+# === Уведомления о вложениях ===
 @receiver(post_save, sender=Attachment)
 def notify_on_attachment(sender, instance, created, **kwargs):
     if not created:

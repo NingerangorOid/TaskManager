@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -41,13 +42,46 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
+
+        if user.is_superuser:
+            # Админ видит всё
             return Task.objects.all().extra(
                 select={'is_mine': "author_id = %s OR assignee_id = %s"},
                 select_params=[user.id, user.id]
             ).order_by('-is_mine', '-created_at')
+
+        elif user.is_staff:
+            # Staff видит всё, кроме задач админов
+            admin_users = User.objects.filter(is_superuser=True).values_list('id', flat=True)
+            return Task.objects.exclude(author__in=admin_users).extra(
+                select={'is_mine': "author_id = %s OR assignee_id = %s"},
+                select_params=[user.id, user.id]
+            ).order_by('-is_mine', '-created_at')
+
         else:
+            # Обычный пользователь — только свои
             return Task.objects.filter(author=user) | Task.objects.filter(assignee=user)
+
+    def perform_update(self, serializer):
+        task = serializer.instance
+        user = self.request.user
+        new_status = self.request.data.get('status')
+
+        # Только админы и staff могут ставить "urgent" и "canceled"
+        if new_status in ['urgent', 'canceled']:
+            if not (user.is_staff or user.is_superuser):
+                raise PermissionDenied("Только администраторы могут устанавливать статус «Срочная» или «Отменена».")
+
+        # Проверка прав на редактирование
+        if not (
+                user == task.author or
+                user == task.assignee or
+                user.is_staff or
+                user.is_superuser
+        ):
+            raise PermissionDenied("У вас нет прав на редактирование этой задачи.")
+
+        serializer.save()
 
     def perform_create(self, serializer):
         # Получаем assignee_id из validated_data

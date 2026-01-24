@@ -29,6 +29,7 @@ class Task(models.Model):
         ('in_progress', 'В работе'),
         ('done', 'Выполнена'),
         ('canceled', 'Отменена'),
+        ('urgent', 'Срочная'),
     ]
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
