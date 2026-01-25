@@ -7,6 +7,7 @@ import StatusDropdown from './StatusDropdown';
 
 const TaskCard = ({ task, canManage, onTaskDeleted }) => {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const canChangeStatus = canManage || (task.assignee && task.assignee.id === task.author?.id);
 
   const handleDelete = async () => {
     if (!window.confirm('Вы уверены, что хотите удалить эту задачу?')) return;
@@ -91,7 +92,7 @@ const TaskCard = ({ task, canManage, onTaskDeleted }) => {
               currentStatus={task.status}
               onChange={handleStatusChange}
               onClose={() => setShowStatusMenu(false)}
-              canManage={canManage} // ← передаём права
+              canManage={canChangeStatus} // ← передаём права
             />
           </div>
         )}

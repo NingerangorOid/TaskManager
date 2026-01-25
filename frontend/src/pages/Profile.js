@@ -29,7 +29,9 @@ const Profile = () => {
       <div className="card p-4">
         <h5>{user.username}</h5>
         <p><strong>ID:</strong> {user.id}</p>
-        <p><strong>Роль:</strong> {user.is_staff ? 'Администратор' : 'Пользователь'}</p>
+        <p><strong>Роль:</strong> {user.is_superuser ? 'Администратор' :
+                                   user.is_staff ? 'Руководитель' :
+                                   'Пользователь'}</p>
       </div>
     </div>
   );

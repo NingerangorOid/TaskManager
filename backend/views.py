@@ -88,10 +88,22 @@ class TaskViewSet(viewsets.ModelViewSet):
         assignee = serializer.validated_data.get('assignee')
 
         # Запрет: обычный пользователь не может назначать задачу админу
-        if assignee and assignee.is_staff and not self.request.user.is_staff:
-            raise serializers.ValidationError({
-                'assignee': 'Вы не можете назначать задачи администраторам.'
-            })
+        if assignee:
+            current_user = self.request.user
+
+            # Обычный пользователь (не staff и не superuser)
+            if not current_user.is_staff and not current_user.is_superuser:
+                if assignee.is_staff or assignee.is_superuser:
+                    raise serializers.ValidationError({
+                        'assignee': 'Вы не можете назначать задачи руководителям.'
+                    })
+
+            # Staff-пользователь (is_staff=True, но не superuser)
+            elif current_user.is_staff and not current_user.is_superuser:
+                if assignee.is_superuser:
+                    raise serializers.ValidationError({
+                        'assignee': 'Вы не можете назначать задачи администраторам.'
+                    })
 
         serializer.save(author=self.request.user, assignee=assignee)
 
@@ -217,6 +229,7 @@ def whoami(request):
                 'id': request.user.id,
                 'username': request.user.username,
                 'is_staff': request.user.is_staff,
+                'is_superuser': request.user.is_superuser,
             }
         })
     return JsonResponse({'error': 'Not authenticated'}, status=401)
