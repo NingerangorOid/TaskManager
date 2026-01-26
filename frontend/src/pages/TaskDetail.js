@@ -18,27 +18,59 @@ const TaskDetail = () => {
   const [uploading, setUploading] = useState(false);
 
   const loadTaskAndComments = async () => {
+  try {
+    setLoading(true);
+
+    const [taskRes, commentsRes, userRes] = await Promise.all([
+      axios.get(`/tasks/${id}/`, { withCredentials: true }),
+      axios.get(`/tasks/${id}/comments/`, { withCredentials: true }),
+      axios.get('/whoami/', { withCredentials: true })
+    ]);
+
+    let commentsData = Array.isArray(commentsRes.data)
+      ? commentsRes.data
+      : commentsRes.data.results || [];
+
+    const user = userRes.data.user;
+
+    // 📁 Загружаем вложения отдельно
+    let attachmentsData = [];
     try {
-      setLoading(true);
-      const [taskRes, commentsRes, userRes] = await Promise.all([
-        axios.get(`/tasks/${id}/`, { withCredentials: true }),
-        axios.get(`/tasks/${id}/comments/`, { withCredentials: true }),
-        axios.get('/whoami/', { withCredentials: true })
-      ]);
+      const attachmentsRes = await axios.get(`/tasks/${id}/attachments/`, { withCredentials: true });
+      attachmentsData = Array.isArray(attachmentsRes.data)
+        ? attachmentsRes.data
+        : attachmentsRes.data.results || [];
 
-      let commentsData = Array.isArray(commentsRes.data)
-        ? commentsRes.data
-        : commentsRes.data.results || [];
+      // 💡 Преобразуем каждое вложение: добавляем file_name из file
+      attachmentsData = attachmentsData.map(att => {
+        // Извлекаем имя файла из URL
+        const fileName = att.file.split('/').pop(); // Берём последнюю часть после '/'
+        return {
+          ...att,
+          file_name: decodeURIComponent(fileName), // Декодируем URL-кодированные символы (например, %D0%B1 → 'б')
+          file_path: att.file // Оставляем как есть — полный URL
+        };
+      });
 
-      setTask(taskRes.data);
-      setComments(commentsData);
-      setCurrentUser(userRes.data.user);
-    } catch (err) {
-      console.error('Ошибка загрузки задачи, комментариев или профиля:', err);
-    } finally {
-      setLoading(false);
+    } catch (attErr) {
+      console.warn('Не удалось загрузить вложения:', attErr);
     }
-  };
+
+    // 💡 Создаём новый объект task, в который добавляем attachments
+    const updatedTask = {
+      ...taskRes.data,
+      attachments: attachmentsData
+    };
+
+    setTask(updatedTask);
+    setComments(commentsData);
+    setCurrentUser(user);
+  } catch (err) {
+    console.error('Ошибка загрузки задачи, комментариев или профиля:', err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     loadTaskAndComments();
