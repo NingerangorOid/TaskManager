@@ -1,6 +1,7 @@
 // src/pages/Dashboard.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Navigate } from 'react-router-dom';
 import TaskCard from '../components/TaskCard';
 
 const Dashboard = () => {
@@ -10,6 +11,7 @@ const Dashboard = () => {
   const [nextPage, setNextPage] = useState(null);
   const [prevPage, setPrevPage] = useState(null);
   const [currentPageUrl, setCurrentPageUrl] = useState('/tasks/'); // ← исправлен URL
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const fetchTasksAndUser = async (url = '/tasks/') => {
     try {
@@ -32,8 +34,18 @@ const Dashboard = () => {
       }
 
       const user = userRes.data.user;
+
+      if (!user) {
+            setIsAuthenticated(false);
+            setLoading(false);
+            return;}
+
       setCanManage(user.is_staff || user.is_superuser); // ← staff + superuser
-    } catch (err) {
+    }
+    catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+  setIsAuthenticated(false);}
+
       console.error('Ошибка загрузки задач или профиля:', err);
       setTasks([]);
       setNextPage(null);
@@ -50,6 +62,9 @@ const Dashboard = () => {
   const handleTaskDeleted = () => {
     fetchTasksAndUser(currentPageUrl);
   };
+
+  if (!isAuthenticated && !loading) {
+  return <Navigate to="/login" replace />;}
 
   if (loading) return <div className="container mt-4">Загрузка...</div>;
 

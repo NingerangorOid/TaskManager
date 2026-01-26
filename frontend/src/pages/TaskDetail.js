@@ -1,80 +1,110 @@
 // src/pages/TaskDetail.js
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import StatusDropdown from '../components/StatusDropdown';
 
 const TaskDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [task, setTask] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   // Для вложений
-  const [files, setFiles] = useState([]); // ← новые файлы
+  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
 
-  const loadTaskAndComments = async () => {
-  try {
-    setLoading(true);
-
-    const [taskRes, commentsRes, userRes] = await Promise.all([
-      axios.get(`/tasks/${id}/`, { withCredentials: true }),
-      axios.get(`/tasks/${id}/comments/`, { withCredentials: true }),
-      axios.get('/whoami/', { withCredentials: true })
-    ]);
-
-    let commentsData = Array.isArray(commentsRes.data)
-      ? commentsRes.data
-      : commentsRes.data.results || [];
-
-    const user = userRes.data.user;
-
-    // 📁 Загружаем вложения отдельно
-    let attachmentsData = [];
+  // 🔥 САМАЯ ВАЖНАЯ ФУНКЦИЯ: ПРОВЕРКА АВТОРИЗАЦИИ ДО ВСЕГО
+  const checkAuthFirst = async () => {
     try {
-      const attachmentsRes = await axios.get(`/tasks/${id}/attachments/`, { withCredentials: true });
-      attachmentsData = Array.isArray(attachmentsRes.data)
-        ? attachmentsRes.data
-        : attachmentsRes.data.results || [];
-
-      // 💡 Преобразуем каждое вложение: добавляем file_name из file
-      attachmentsData = attachmentsData.map(att => {
-        // Извлекаем имя файла из URL
-        const fileName = att.file.split('/').pop(); // Берём последнюю часть после '/'
-        return {
-          ...att,
-          file_name: decodeURIComponent(fileName), // Декодируем URL-кодированные символы (например, %D0%B1 → 'б')
-          file_path: att.file // Оставляем как есть — полный URL
-        };
-      });
-
-    } catch (attErr) {
-      console.warn('Не удалось загрузить вложения:', attErr);
+      const res = await axios.get('/whoami/', { withCredentials: true });
+      return !!res.data.user;
+    } catch (err) {
+      return false;
     }
+  };
 
-    // 💡 Создаём новый объект task, в который добавляем attachments
-    const updatedTask = {
-      ...taskRes.data,
-      attachments: attachmentsData
-    };
+  const loadTaskAndComments = async () => {
+    try {
+      setLoading(true);
 
-    setTask(updatedTask);
-    setComments(commentsData);
-    setCurrentUser(user);
-  } catch (err) {
-    console.error('Ошибка загрузки задачи, комментариев или профиля:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+      // 🔥 ПРОВЕРЯЕМ АВТОРИЗАЦИЮ СРАЗУ ЖЕ
+      const isAuth = await checkAuthFirst();
+      if (!isAuth) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const [taskRes, commentsRes, userRes] = await Promise.all([
+        axios.get(`/tasks/${id}/`, { withCredentials: true }),
+        axios.get(`/tasks/${id}/comments/`, { withCredentials: true }),
+        axios.get('/whoami/', { withCredentials: true })
+      ]);
+
+      let commentsData = Array.isArray(commentsRes.data)
+        ? commentsRes.data
+        : commentsRes.data.results || [];
+
+      const user = userRes.data.user;
+      if (!user) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      // 📁 Загружаем вложения отдельно
+      let attachmentsData = [];
+      try {
+        const attachmentsRes = await axios.get(`/tasks/${id}/attachments/`, { withCredentials: true });
+        attachmentsData = Array.isArray(attachmentsRes.data)
+          ? attachmentsRes.data
+          : attachmentsRes.data.results || [];
+
+        // 💡 Преобразуем каждое вложение: добавляем file_name из file
+        attachmentsData = attachmentsData.map(att => {
+          // Извлекаем имя файла из URL
+          const fileName = att.file.split('/').pop();
+          return {
+            ...att,
+            file_name: decodeURIComponent(fileName),
+            file_path: att.file
+          };
+        });
+      } catch (attErr) {
+        console.warn('Не удалось загрузить вложения:', attErr);
+      }
+
+      // 💡 Создаём новый объект task, в который добавляем attachments
+      const updatedTask = {
+        ...taskRes.data,
+        attachments: attachmentsData
+      };
+
+      setTask(updatedTask);
+      setComments(commentsData);
+      setCurrentUser(user);
+    } catch (err) {
+      console.error('Ошибка загрузки задачи, комментариев или профиля:', err);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setIsAuthenticated(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadTaskAndComments();
   }, [id]);
+
+  // 🔥 ГЛАВНЫЙ РЕДИРЕКТ - САМЫЙ ПЕРВЫЙ
+  if (!isAuthenticated && !loading) {
+    return <Navigate to="/login" replace />;
+  }
 
   const canManage = currentUser?.is_staff || currentUser?.is_superuser;
   const isCurrentUserAssignee = task?.assignee?.id === currentUser?.id;
@@ -156,7 +186,7 @@ const TaskDetail = () => {
         }
       );
       setFiles([]);
-      loadTaskAndComments(); // Перезагружаем задачу, чтобы обновить список вложений
+      loadTaskAndComments();
     } catch (err) {
       console.error('Ошибка загрузки вложений:', err);
     } finally {
@@ -219,7 +249,7 @@ const TaskDetail = () => {
                   currentStatus={task.status}
                   onChange={handleStatusChange}
                   onClose={() => setShowStatusMenu(false)}
-                  canManage={canManage} // ← ключевой пропс
+                  canManage={canManage}
                 />
               </div>
             )}

@@ -1,7 +1,7 @@
 // src/pages/Tasks.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 
 const Tasks = () => {
   const [title, setTitle] = useState('');
@@ -11,10 +11,25 @@ const Tasks = () => {
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+  const checkAuth = async () => {
+    try {
+      const res = await axios.get('/whoami/', { withCredentials: true });
+      if (!res.data.user) {
+        setIsAuthenticated(false);
+      } else {
+        fetchUsers();
+      }
+    } catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setIsAuthenticated(false);
+      }
+    }
+  };
+  checkAuth();
+}, []);
 
   const fetchUsers = async () => {
     try {
@@ -88,6 +103,9 @@ const Tasks = () => {
       console.error(err);
     }
   };
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="container mt-4">
